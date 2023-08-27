@@ -11,12 +11,11 @@ authors = [
 description = "Properly load user extensions in IDLE"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {file = "LICENSE"}
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -135,13 +134,12 @@ max-complexity = 10
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    envlist = py38, py39, py310, py311, mypy, pytest
+    envlist = py39, py310, py311, mypy, pytest
     isolated_build = false
 
     [gh-actions]
     python =
-        3.8: py38, mypy, pytest
-        3.9: py39
+        3.9: py39, mypy, pytest
         3.10: py310
         3.11: py311, mypy, pytest
 
