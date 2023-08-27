@@ -135,13 +135,15 @@ max-complexity = 10
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    envlist = py310, py311, mypy, pytest
+    envlist = py38, py39, py310, py311, mypy, pytest
     isolated_build = false
 
     [gh-actions]
     python =
-        3.10: py310, mypy, pytest
-        3.11: py311, mypy
+        3.8: py38, mypy, pytest
+        3.9: py39
+        3.10: py310
+        3.11: py311, mypy, pytest
 
     [testenv]
     setenv =
