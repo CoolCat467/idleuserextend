@@ -1,6 +1,13 @@
 # IdleUserExtend
 Extension that fixes loading extensions from the user config file.
 
+<!-- BADGIE TIME -->
+
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+[![code style: black](https://img.shields.io/badge/code_style-black-000000.svg)](https://github.com/psf/black)
+
+<!-- END BADGIE TIME -->
+
 ## What does this extension do?
 This IDLE extension patches IDLE to be able to properly load extensions
 from the user configuration directory (`~/.idlerc/config-extensions.cfg`)
