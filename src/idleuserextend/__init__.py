@@ -330,13 +330,6 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
                         def_obj = def_str
                         opt_type = None
                 try:
-                    value = self.ext_userCfg.Get(
-                        ext_name,
-                        opt_name,
-                        type=opt_type,
-                        raw=True,
-                        default=def_obj,
-                    )
                     if opt_name in user:
                         value = self.ext_userCfg.Get(
                             ext_name,
@@ -357,6 +350,7 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
                     value = def_obj  # Bad values overwritten by entry.
                 var = StringVar(self)
                 var.set(str(value))
+
                 self.extensions[ext_name].append(
                     {
                         "name": opt_name,
@@ -392,7 +386,6 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
             set_extension_value
         """
         for ext_name in self.extensions:
-            self.extensions[ext_name]
             for opt in self.extensions[ext_name]:
                 self.set_extension_value(ext_name, opt)
         self.ext_userCfg.Save()
