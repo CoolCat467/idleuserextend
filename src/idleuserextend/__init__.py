@@ -373,7 +373,7 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
 
         # Only save option in user config if it differs from the default
         if self.ext_defaultCfg.has_section(section) and value == default:
-            return self.ext_userCfg.RemoveOption(section, name)
+            return bool(self.ext_userCfg.RemoveOption(section, name))
 
         # Set the option.
         return bool(self.ext_userCfg.SetOption(section, name, value))
