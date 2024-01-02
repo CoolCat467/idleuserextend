@@ -305,7 +305,6 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
             opt_list = enables + opt_list
 
             for opt_name in opt_list:
-                def_str = self.ext_defaultCfg.Get(ext_name, opt_name, raw=True)
                 if opt_name in user:
                     def_str = self.ext_userCfg.Get(
                         ext_name,
@@ -371,6 +370,10 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
         default = opt["default"]
         value = opt["var"].get().strip() or default
         opt["var"].set(value)
+
+        # Only save option in user config if it differs from the default
+        if self.ext_defaultCfg.has_section(section) and value == default:
+            return self.ext_userCfg.RemoveOption(section, name)
 
         # Set the option.
         return bool(self.ext_userCfg.SetOption(section, name, value))
