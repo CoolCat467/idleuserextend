@@ -387,6 +387,7 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
         Methods
         -------
             set_extension_value
+
         """
         for ext_name in self.extensions:
             for opt in self.extensions[ext_name]:
@@ -404,9 +405,9 @@ def remove_keybindings(editwin: PyShellEditorWindow) -> Callable[[], None]:
     def inner() -> None:
         """Remove keybinds before changed."""
         # Called from configdialog.py
-        editwin.mainmenu.default_keydefs = (
-            keydefs
-        ) = idleConf.GetCurrentKeySet()
+        editwin.mainmenu.default_keydefs = keydefs = (
+            idleConf.GetCurrentKeySet()
+        )
         for event, keylist in keydefs.items():
             with contextlib.suppress(ValueError):
                 editwin.text.event_delete(event, *keylist)
