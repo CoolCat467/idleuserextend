@@ -7,47 +7,42 @@ Extension that fixes loading extensions from the user config file.
 
 from __future__ import annotations
 
+# Idle User Extend
+# Copyright (C) 2023-2024  CoolCat467
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 __title__ = "idleuserextend"
 __author__ = "CoolCat467"
-__license__ = "GPLv3"
-__version__ = "0.0.0"
+__license__ = "GNU General Public License Version 3"
+__version__ = "0.0.1"
 
 
 import contextlib
-import os
 import sys
 from collections import ChainMap
-from collections.abc import Callable
 from functools import wraps
 from tkinter import StringVar
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import idlelib.configdialog
 from idlelib.config import IdleConf, idleConf
-from idlelib.pyshell import PyShellEditorWindow
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-def get_required_config(
-    values: dict[str, str],
-    bind_defaults: dict[str, str],
-) -> str:
-    """Get required configuration file data."""
-    config = ""
-    # Get configuration defaults
-    settings = "\n".join(
-        f"{key} = {default}" for key, default in values.items()
-    )
-    if settings:
-        config += f"\n[{__title__}]\n{settings}"
-        if bind_defaults:
-            config += "\n"
-    # Get key bindings data
-    settings = "\n".join(
-        f"{event} = {key}" for event, key in bind_defaults.items()
-    )
-    if settings:
-        config += f"\n[{__title__}_cfgBindings]\n{settings}"
-    return config
+    from idlelib.pyshell import PyShellEditorWindow
 
 
 def check_installed() -> bool:
@@ -56,7 +51,6 @@ def check_installed() -> bool:
     extensions = set(idleConf.defaultCfg["extensions"]) | set(
         idleConf.userCfg["extensions"],
     )
-    ex_defaults = idleConf.userCfg["extensions"].file
 
     # Import this extension (this file),
     module = __import__(__title__)
@@ -71,27 +65,12 @@ def check_installed() -> bool:
         )
         sys.exit(1)
 
-    cls = getattr(module, __title__)
-
-    # Get extension class keybinding defaults
-    required_config = get_required_config(
-        getattr(cls, "values", {}),
-        getattr(cls, "bind_defaults", {}),
-    )
-
     # If this extension not in there,
     if __title__ not in extensions:
         # Tell user how to add it to system list.
         print(f"{__title__} not in system registered extensions!")
-        print(
-            f"Please run the following command to add {__title__} "
-            + "to system extensions list.\n",
-        )
-        # Make sure line-breaks will go properly in terminal
-        add_data = required_config.replace("\n", "\\n")
-        # Tell them the command
-        print(f"echo -e '{add_data}' >> {ex_defaults}")
-        print()
+        print("This should not be possible! If you see this message,")
+        print("please report this issue on Github!")
     else:
         print(f"Configuration should be good! (v{__version__})")
         return True
@@ -443,9 +422,6 @@ class idleuserextend:  # noqa: N801
     }
     # Default key binds for configuration file
     bind_defaults: ClassVar = {}
-
-    # Class attributes
-    idlerc_folder = os.path.expanduser(idleConf.userdir)
 
     def __init__(self, editwin: PyShellEditorWindow) -> None:
         """Initialize the settings for this extension."""
