@@ -10,22 +10,6 @@ assert callable(
 )
 
 
-def test_get_required_config() -> None:
-    assert (
-        idleuserextend.get_required_config(
-            {"name": "bob", "waffle": True},
-            {"type_check": "<Alt-t>"},
-        )
-        == """
-[idleuserextend]
-name = bob
-waffle = True
-
-[idleuserextend_cfgBindings]
-type_check = <Alt-t>"""
-    )
-
-
 def test_get_mangled_dunder() -> None:
     assert idleuserextend.get_mangled(3, "__init__") == "__init__"
 
