@@ -29,7 +29,6 @@ __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.1"
 
 
-import contextlib
 import sys
 from collections import ChainMap
 from functools import wraps
@@ -40,7 +39,6 @@ import idlelib.configdialog
 from idlelib.config import IdleConf, idleConf
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
 
     from idlelib.pyshell import PyShellEditorWindow
 
@@ -377,30 +375,6 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
 idlelib.configdialog.ExtPage = ExtPage
 
 
-def remove_keybindings(editwin: PyShellEditorWindow) -> Callable[[], None]:
-    """Remove the keybindings before they are changed."""
-
-    @wraps(editwin.RemoveKeybindings)
-    def inner() -> None:
-        """Remove keybinds before changed."""
-        # Called from configdialog.py
-        editwin.mainmenu.default_keydefs = keydefs = (
-            idleConf.GetCurrentKeySet()
-        )
-        for event, keylist in keydefs.items():
-            with contextlib.suppress(ValueError):
-                editwin.text.event_delete(event, *keylist)
-
-        for extension_name in editwin.get_standard_extension_names():
-            xkeydefs = idleConf.GetExtensionBindings(extension_name)
-            if xkeydefs:
-                for event, keylist in xkeydefs.items():
-                    with contextlib.suppress(ValueError):
-                        editwin.text.event_delete(event, *keylist)
-
-    return inner
-
-
 # Important weird: If event handler function returns 'break',
 # then it prevents other bindings of same event type from running.
 # If returns None, normal and others are also run.
@@ -428,24 +402,9 @@ class idleuserextend:  # noqa: N801
         self.editwin: PyShellEditorWindow = editwin
         # print(f"{__title__} Initialize")
 
-        # for name, instance in editwin.extensions.items():
-        #     keydefs = idleConf.GetExtensionBindings(name)
-        #     for keydef in keydefs:
-        #         editwin.text.unbind(keydef)
-        #     if keydefs:
-        #         for event, keylist in keydefs.items():
-        #             if keylist:
-        #                 editwin.text.event_add(event, *keylist)
-        #         for vevent in keydefs:
-        #             methodname = vevent.replace("-", "_")
-        #             while methodname[:1] == '<':
-        #                 methodname = methodname[1:]
-        #             while methodname[-1:] == '>':
-        #                 methodname = methodname[:-1]
-        #             methodname = f'{methodname}_event'
-        #             if hasattr(instance, methodname):
-        #                 editwin.text.bind(vevent, getattr(instance, methodname))
-        editwin.RemoveKeybindings = remove_keybindings(editwin)
+        # Unbind and rebind everything
+        editwin.RemoveKeybindings()
+        editwin.ApplyKeybindings()
 
     def __repr__(self) -> str:
         """Return representation of self."""
