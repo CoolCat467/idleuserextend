@@ -30,6 +30,7 @@ __version__ = "0.0.1"
 
 
 import sys
+import traceback
 from collections import ChainMap
 from functools import wraps
 from tkinter import StringVar
@@ -39,6 +40,7 @@ import idlelib.configdialog
 from idlelib.config import IdleConf, idleConf
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
 
     from idlelib.pyshell import PyShellEditorWindow
 
@@ -375,6 +377,34 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
 idlelib.configdialog.ExtPage = ExtPage
 
 
+def remove_keybindings(editwin: PyShellEditorWindow) -> Callable[[], None]:
+    """Remove the keybindings before they are changed."""
+
+    @wraps(editwin.RemoveKeybindings)
+    def inner() -> None:
+        """Remove keybinds before changed."""
+        # Called from configdialog.py
+        editwin.mainmenu.default_keydefs = keydefs = (
+            idleConf.GetCurrentKeySet()
+        )
+        for event, keylist in keydefs.items():
+            editwin.text.event_delete(event, *keylist)
+
+        for extension_name in editwin.get_standard_extension_names():
+            xkeydefs = idleConf.GetExtensionBindings(extension_name)
+            if xkeydefs:
+                for event, keylist in xkeydefs.items():
+                    try:
+                        editwin.text.event_delete(event, *keylist)
+                    except ValueError:
+                        print(
+                            "[idleuserextend] Exception in RemoveKeybindings",
+                        )
+                        traceback.print_exc()
+
+    return inner
+
+
 # Important weird: If event handler function returns 'break',
 # then it prevents other bindings of same event type from running.
 # If returns None, normal and others are also run.
@@ -402,7 +432,10 @@ class idleuserextend:  # noqa: N801
         self.editwin: PyShellEditorWindow = editwin
         # print(f"{__title__} Initialize")
 
+        self.editwin.RemoveKeybindings = remove_keybindings(self.editwin)
+
         # Unbind and rebind everything
+        editwin.ApplyKeybindings()
         editwin.RemoveKeybindings()
         editwin.ApplyKeybindings()
 
