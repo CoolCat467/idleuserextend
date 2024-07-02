@@ -29,14 +29,13 @@ __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.1"
 
 
+import idlelib.configdialog
 import sys
 from collections import ChainMap
 from functools import wraps
+from idlelib.config import IdleConf, idleConf
 from tkinter import StringVar
 from typing import TYPE_CHECKING, ClassVar
-
-import idlelib.configdialog
-from idlelib.config import IdleConf, idleConf
 
 if TYPE_CHECKING:
     from idlelib.pyshell import PyShellEditorWindow
