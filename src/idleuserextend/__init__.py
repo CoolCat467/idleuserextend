@@ -252,6 +252,8 @@ def load_cfg_files() -> None:
 
 idleConf.LoadCfgFiles = load_cfg_files
 
+original_ext_page = idlelib.configdialog.ExtPage
+
 
 class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass "ExtPage", is "Any"
     """Modified copy of ExtPage with patched load_extensions."""
@@ -264,7 +266,6 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
             # Former built-in extensions are already filtered out.
             self.extensions[ext_name] = []
 
-        for ext_name in self.extensions:
             default = set(self.ext_defaultCfg.GetOptionList(ext_name))
             user = set(self.ext_userCfg.GetOptionList(ext_name))
             opt_list = sorted(default | user)
@@ -353,21 +354,22 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
         # Set the option.
         return bool(self.ext_userCfg.SetOption(section, name, value))
 
-    def save_all_changed_extensions(self) -> None:
-        """Save configuration changes to the user config file.
 
-        Attributes accessed:
-            extensions
-
-        Methods
-        -------
-            set_extension_value
-
-        """
-        for ext_name in self.extensions:
-            for opt in self.extensions[ext_name]:
-                self.set_extension_value(ext_name, opt)
-        self.ext_userCfg.Save()
+#     def save_all_changed_extensions(self) -> None:
+#         """Save configuration changes to the user config file.
+#
+#         Attributes accessed:
+#             extensions
+#
+#         Methods
+#         -------
+#             set_extension_value
+#
+#         """
+#         for ext_name in self.extensions:
+#             for opt in self.extensions[ext_name]:
+#                 self.set_extension_value(ext_name, opt)
+#         self.ext_userCfg.Save()
 
 
 idlelib.configdialog.ExtPage = ExtPage
@@ -461,6 +463,18 @@ class idleuserextend:  # noqa: N801
                     default=default,
                 )
                 setattr(cls, key, value)
+
+    def close(self) -> None:
+        """Restore IDLE to original state."""
+        setattr(
+            idleConf,
+            get_mangled(idleConf, "__GetRawExtensionKeys"),
+            get_raw_extension_keys.__wrapped__,
+        )
+        idleConf.GetExtensionKeys = get_extension_keys.__wrapped__
+        idleConf.GetExtensionBindings = get_ext_bindings.__wrapped__
+        idleConf.LoadCfgFiles = load_cfg_files.__wrapped__
+        idlelib.configdialog.ExtPage = original_ext_page
 
 
 idleuserextend.reload()
