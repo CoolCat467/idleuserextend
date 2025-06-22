@@ -8,7 +8,7 @@ Extension that fixes loading extensions from the user config file.
 from __future__ import annotations
 
 # Idle User Extend
-# Copyright (C) 2023-2024  CoolCat467
+# Copyright (C) 2023-2025  CoolCat467
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,18 +26,19 @@ from __future__ import annotations
 __title__ = "idleuserextend"
 __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 
 
 import idlelib.configdialog
 import sys
 from collections import ChainMap
 from functools import wraps
-from idlelib.config import IdleConf, idleConf
+from idlelib.config import idleConf
 from tkinter import StringVar
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable, Mapping
     from idlelib.pyshell import PyShellEditorWindow
 
 
@@ -115,8 +116,17 @@ def get_mangled(obj: object, attribute: str) -> str:
     return f"_{obj.__class__.__name__}{attribute}"
 
 
+def yield_string_entries(
+    iterable: Iterable[object],
+) -> Generator[str, None, None]:
+    """Yield string entries from an iterable."""
+    for entry in iterable:
+        if isinstance(entry, str):
+            yield entry
+
+
 @wraps(getattr(idleConf, get_mangled(idleConf, "__GetRawExtensionKeys")))
-def get_raw_extension_keys(extension: str) -> dict[str, list[str]]:
+def get_raw_extension_keys(extension: str) -> dict[str, list[str]]:  # type: ignore[misc]
     """Return dict {configurable extension event : keybinding list}.
 
     Events come from default config extension_cfgBindings section.
@@ -126,12 +136,11 @@ def get_raw_extension_keys(extension: str) -> dict[str, list[str]]:
     ext_bindings_section = f"{extension}_cfgBindings"
     extension_keys: dict[str, list[str]] = {}
     if idleConf.defaultCfg["extensions"].has_section(ext_bindings_section):
-        raw_event_names = idleConf.defaultCfg["extensions"].GetOptionList(
-            ext_bindings_section,
+        event_names = yield_string_entries(
+            idleConf.defaultCfg["extensions"].GetOptionList(
+                ext_bindings_section,
+            ),
         )
-        event_names = [
-            name for name in raw_event_names if isinstance(name, str)
-        ]
         for event_name in event_names:
             binding = str(
                 idleConf.GetOption(
@@ -144,8 +153,10 @@ def get_raw_extension_keys(extension: str) -> dict[str, list[str]]:
             event = f"<<{event_name}>>"
             extension_keys[event] = binding
     if idleConf.userCfg["extensions"].has_section(ext_bindings_section):
-        event_names = idleConf.userCfg["extensions"].GetOptionList(
-            ext_bindings_section,
+        event_names = yield_string_entries(
+            idleConf.userCfg["extensions"].GetOptionList(
+                ext_bindings_section,
+            ),
         )
         for event_name in event_names:
             binding = str(
@@ -169,7 +180,7 @@ setattr(
 
 
 @wraps(idleConf.GetExtensionKeys)
-def get_extension_keys(extension: str) -> dict[str, list[str] | str]:
+def get_extension_keys(extension: str) -> Mapping[str, list[str] | str]:
     """Return dict: {configurable extension event : active keybinding}.
 
     Events come from default config extension_cfgBindings section.
@@ -178,7 +189,7 @@ def get_extension_keys(extension: str) -> dict[str, list[str] | str]:
     """
     ext_bindings_section = f"{extension}_cfgBindings"
     current_keyset = idleConf.GetCurrentKeySet()
-    extension_keys = {}
+    extension_keys: Mapping[str, list[str] | str] = {}
 
     event_names = set()
     if idleConf.userCfg["extensions"].has_section(ext_bindings_section):
@@ -203,7 +214,7 @@ def get_extension_keys(extension: str) -> dict[str, list[str] | str]:
     return extension_keys
 
 
-idleConf.GetExtensionKeys = get_extension_keys
+idleConf.GetExtensionKeys = get_extension_keys  # type: ignore[method-assign]
 
 
 @wraps(idleConf.GetExtensionBindings)
@@ -223,7 +234,7 @@ def get_ext_bindings(extension: str) -> dict[str, list[str]]:
             idleConf.defaultCfg["extensions"].GetOptionList(bindings_section),
         )
 
-    event_names = ChainMap(*values)
+    event_names: Iterable[str] = ChainMap(*values)
 
     if event_names:
         for event_name in event_names:
@@ -232,13 +243,18 @@ def get_ext_bindings(extension: str) -> dict[str, list[str]]:
                 bindings_section,
                 event_name,
                 default="",
-            ).split()
+            )
+            if not isinstance(binding, str):
+                print(
+                    f"Non-string binding in idle extensions config: {bindings_section}.{event_name}",
+                )
+                continue
             event = f"<<{event_name}>>"
-            extension_keys[event] = binding
+            extension_keys[event] = binding.split()
     return extension_keys
 
 
-idleConf.GetExtensionBindings = get_ext_bindings
+idleConf.GetExtensionBindings = get_ext_bindings  # type: ignore[method-assign]
 
 
 @wraps(idleConf.LoadCfgFiles)
@@ -250,17 +266,17 @@ def load_cfg_files() -> None:
         idleConf.userCfg[key].Load()
 
 
-idleConf.LoadCfgFiles = load_cfg_files
+idleConf.LoadCfgFiles = load_cfg_files  # type: ignore[method-assign]
 
 original_ext_page = idlelib.configdialog.ExtPage
 
 
-class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass "ExtPage", is "Any"
+class ExtPage(idlelib.configdialog.ExtPage):
     """Modified copy of ExtPage with patched load_extensions."""
 
     def load_extensions(self) -> None:
         """Fill self.extensions with data from the default and user configs."""
-        self.extensions: dict[str, list[dict[str, object]]] = {}
+        self.extensions: dict[str, list[dict[str, str]]] = {}
 
         for ext_name in idleConf.GetExtensions(active_only=False):
             # Former built-in extensions are already filtered out.
@@ -268,7 +284,7 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
 
             default = set(self.ext_defaultCfg.GetOptionList(ext_name))
             user = set(self.ext_userCfg.GetOptionList(ext_name))
-            opt_list = sorted(default | user)
+            opt_list = sorted(yield_string_entries(default | user))
 
             # Bring 'enable' options to the beginning of the list.
             enables = [
@@ -336,7 +352,7 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
                     },
                 )
 
-    def set_extension_value(self, section: str, opt: IdleConf) -> bool:
+    def set_extension_value(self, section: str, opt: dict[str, str]) -> bool:
         """Return True if the configuration was added or changed.
 
         If the value is the same as the default, then remove it
@@ -372,7 +388,8 @@ class ExtPage(idlelib.configdialog.ExtPage):  # type: ignore  # Cannot subclass 
 #         self.ext_userCfg.Save()
 
 
-idlelib.configdialog.ExtPage = ExtPage
+# Cannot assign to a type
+idlelib.configdialog.ExtPage = ExtPage  # type: ignore[misc]
 
 
 # Important weird: If event handler function returns 'break',
@@ -471,10 +488,10 @@ class idleuserextend:  # noqa: N801
             get_mangled(idleConf, "__GetRawExtensionKeys"),
             get_raw_extension_keys.__wrapped__,
         )
-        idleConf.GetExtensionKeys = get_extension_keys.__wrapped__
-        idleConf.GetExtensionBindings = get_ext_bindings.__wrapped__
-        idleConf.LoadCfgFiles = load_cfg_files.__wrapped__
-        idlelib.configdialog.ExtPage = original_ext_page
+        idleConf.GetExtensionKeys = get_extension_keys.__wrapped__  # type: ignore[method-assign]
+        idleConf.GetExtensionBindings = get_ext_bindings.__wrapped__  # type: ignore[method-assign]
+        idleConf.LoadCfgFiles = load_cfg_files.__wrapped__  # type: ignore[method-assign]
+        idlelib.configdialog.ExtPage = original_ext_page  # type: ignore[misc]
 
 
 idleuserextend.reload()
