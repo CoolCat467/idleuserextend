@@ -498,7 +498,10 @@ def apply_keybindings_for_previous(editwin: PyShellEditorWindow) -> None:
             if not accel:
                 continue
             item_name = menu.entrycget(index, "label")
-            event = menu_event_dict.get(menubar_item, set()).get(item_name, "")
+            items = menu_event_dict.get(menubar_item)
+            if not items:
+                continue
+            event = items.get(item_name, None)
             if not event:
                 continue
             accel = get_accelerator(editwin.mainmenu.default_keydefs, event)
