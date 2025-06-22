@@ -33,6 +33,7 @@ import idlelib.configdialog
 import sys
 from functools import wraps
 from idlelib.config import idleConf
+from idlelib.editor import get_accelerator, prepstr
 from tkinter import StringVar
 from typing import TYPE_CHECKING, ClassVar
 
@@ -179,6 +180,32 @@ setattr(
 )
 
 
+def get_user_extension_event_names(section: str) -> set[str]:
+    """Return user extension event names."""
+    event_names: set[str] = set()
+    if idleConf.userCfg["extensions"].has_section(section):
+        event_names.update(
+            yield_string_entries(
+                idleConf.userCfg["extensions"].GetOptionList(section),
+            ),
+        )
+    return event_names
+
+
+def get_default_extension_event_names(section: str) -> set[str]:
+    """Return default extension event names."""
+    event_names: set[str] = set()
+    if idleConf.defaultCfg["extensions"].has_section(section):
+        event_names.update(
+            yield_string_entries(
+                idleConf.defaultCfg["extensions"].GetOptionList(
+                    section,
+                ),
+            ),
+        )
+    return event_names
+
+
 @wraps(idleConf.GetExtensionKeys)
 def get_extension_keys(extension: str) -> dict[str, list[str]]:
     """Return dict: {configurable extension event : active keybinding}.
@@ -191,19 +218,8 @@ def get_extension_keys(extension: str) -> dict[str, list[str]]:
     current_keyset = idleConf.GetCurrentKeySet()
     extension_keys: dict[str, list[str]] = {}
 
-    event_names = set()
-    if idleConf.userCfg["extensions"].has_section(ext_bindings_section):
-        event_names |= set(
-            idleConf.userCfg["extensions"].GetOptionList(
-                ext_bindings_section,
-            ),
-        )
-    if idleConf.defaultCfg["extensions"].has_section(ext_bindings_section):
-        event_names |= set(
-            idleConf.defaultCfg["extensions"].GetOptionList(
-                ext_bindings_section,
-            ),
-        )
+    event_names = get_user_extension_event_names(ext_bindings_section)
+    event_names |= get_default_extension_event_names(ext_bindings_section)
 
     for event_name in event_names:
         event = f"<<{event_name}>>"
@@ -217,48 +233,55 @@ def get_extension_keys(extension: str) -> dict[str, list[str]]:
 idleConf.GetExtensionKeys = get_extension_keys  # type: ignore[method-assign,assignment]
 
 
-@wraps(idleConf.GetExtensionBindings)
-def get_ext_bindings(extension: str) -> dict[str, list[str]]:
+def get_extension_event_key_bindings(
+    extension: str,
+    event_names: Iterable[str],
+) -> dict[str, list[str]]:
     """Return dict {extension event : active or defined keybinding}."""
-    bindings_section = f"{extension}_bindings"
     extension_keys: dict[str, list[str]] = idleConf.GetExtensionKeys(extension)
-    # add the non-configurable bindings
+    bindings_section = f"{extension}_bindings"
 
-    event_names: list[str] = []
-    if idleConf.userCfg["extensions"].has_section(bindings_section):
-        event_names.extend(
-            yield_string_entries(
-                idleConf.userCfg["extensions"].GetOptionList(bindings_section),
-            ),
+    for event_name in event_names:
+        binding = idleConf.GetOption(
+            "extensions",
+            bindings_section,
+            event_name,
+            default="",
         )
-    if idleConf.defaultCfg["extensions"].has_section(bindings_section):
-        event_names.extend(
-            yield_string_entries(
-                idleConf.defaultCfg["extensions"].GetOptionList(
-                    bindings_section,
-                ),
-            ),
-        )
-
-    if event_names:
-        for event_name in event_names:
-            binding = idleConf.GetOption(
-                "extensions",
-                bindings_section,
-                event_name,
-                default="",
+        if not isinstance(binding, str):
+            print(
+                f"[{__title__}] Non-string binding in idle extensions config: {bindings_section}.{event_name}",
             )
-            if not isinstance(binding, str):
-                print(
-                    f"Non-string binding in idle extensions config: {bindings_section}.{event_name}",
-                )
-                continue
-            event = f"<<{event_name}>>"
-            extension_keys[event] = binding.split()
+            continue
+        event = f"<<{event_name}>>"
+        extension_keys[event] = binding.split()
     return extension_keys
 
 
-idleConf.GetExtensionBindings = get_ext_bindings  # type: ignore[method-assign,assignment]
+@wraps(idleConf.GetExtensionBindings)
+def get_extension_bindings(extension: str) -> dict[str, list[str]]:
+    """Return dict {extension event : active or defined keybinding}."""
+    bindings_section = f"{extension}_bindings"
+    # add the non-configurable bindings
+
+    event_names = get_user_extension_event_names(bindings_section)
+    event_names |= get_default_extension_event_names(bindings_section)
+
+    return get_extension_event_key_bindings(extension, event_names)
+
+
+idleConf.GetExtensionBindings = get_extension_bindings  # type: ignore[method-assign,assignment]
+
+
+def get_user_added_extension_bindings(extension: str) -> dict[str, list[str]]:
+    """Return dict {extension event : active or defined keybinding}."""
+    bindings_section = f"{extension}_bindings"
+    # add the non-configurable bindings
+
+    event_names = get_user_extension_event_names(bindings_section)
+    event_names -= get_default_extension_event_names(bindings_section)
+
+    return get_extension_event_key_bindings(extension, event_names)
 
 
 @wraps(idleConf.LoadCfgFiles)
@@ -266,6 +289,7 @@ def load_cfg_files() -> None:
     """Load all configuration files."""
     for key in idleConf.defaultCfg:
         idleConf.defaultCfg[key].Load()
+    # might have different keys hence patching
     for key in idleConf.userCfg:
         idleConf.userCfg[key].Load()
 
@@ -407,6 +431,80 @@ class ExtPage(idlelib.configdialog.ExtPage):
 idlelib.configdialog.ExtPage = ExtPage  # type: ignore[misc]
 
 
+def find_added_bindings(
+    new: dict[str, list[str]],
+    old: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    """Return the bindings that were added compared to old."""
+    sections_new = set(new)
+    sections_old = set(old)
+    new_sections = sections_new - sections_old
+    existing_sections = sections_new & sections_old
+
+    added_bindings: dict[str, list[str]] = {
+        section: new[section] for section in new_sections
+    }
+    for section in existing_sections:
+        bindings_new = set(new[section])
+        bindings_old = set(old[section])
+        added = bindings_new - bindings_old
+        if added:
+            added_bindings[section] = list(added)
+
+    return added_bindings
+
+
+def apply_keybindings_for_previous(editwin: PyShellEditorWindow) -> None:
+    """Apply the virtual keybindings for extensions that didn't load properly.
+
+    Also update hotkeys to current keyset.
+
+    Modified version of idlelib.editor.ApplyKeybindings.
+    """
+    new_default_keydefs = idleConf.GetCurrentKeySet()
+    added_bindings = find_added_bindings(
+        new_default_keydefs,
+        editwin.mainmenu.default_keydefs,
+    )
+    # print(f'[{__title__}] {added_bindings = }')
+    editwin.apply_bindings(added_bindings)
+    editwin.mainmenu.default_keydefs = new_default_keydefs  # type: ignore[attr-defined]
+    # Already handled adding extension keybindings as a part of prior
+    # for extension_name in editwin.get_standard_extension_names():
+    #     extension_keydefs = get_user_added_extension_bindings(extension_name)
+    #     print(f'[{__title__}] {extension_name = } {extension_keydefs = }')
+    #     if extension_keydefs:
+    #         editwin.apply_bindings(extension_keydefs)
+
+    # Update menu accelerators.
+    menu_event_dict: dict[str, dict[str, str]] = {}
+    for group_title, bindings in editwin.mainmenu.menudefs:
+        menu_event_dict[group_title] = {}
+        for item in bindings:
+            if not item:
+                continue
+            label, virt_event = item
+            menu_event_dict[group_title][prepstr(label)[1]] = virt_event
+    for menubar_item, menu in editwin.menudict.items():
+        end = menu.index("end")
+        if end is None:
+            # Skip empty menus
+            continue
+        end += 1
+        for index in range(end):
+            if menu.type(index) != "command":
+                continue
+            accel = menu.entrycget(index, "accelerator")
+            if not accel:
+                continue
+            item_name = menu.entrycget(index, "label")
+            event = menu_event_dict.get(menubar_item, set()).get(item_name, "")
+            if not event:
+                continue
+            accel = get_accelerator(editwin.mainmenu.default_keydefs, event)
+            menu.entryconfig(index, accelerator=accel)
+
+
 # Important weird: If event handler function returns 'break',
 # then it prevents other bindings of same event type from running.
 # If returns None, normal and others are also run.
@@ -432,12 +530,10 @@ class idleuserextend:  # noqa: N801
     def __init__(self, editwin: PyShellEditorWindow) -> None:
         """Initialize the settings for this extension."""
         self.editwin: PyShellEditorWindow = editwin
-        # print(f"{__title__} Initialize")
+        # print(f"[{__title__}] Initialize")
 
-        # Unbind and rebind everything
-        editwin.ApplyKeybindings()
-        editwin.RemoveKeybindings()
-        editwin.ApplyKeybindings()
+        # Properly bind extensions that didn't load completely before
+        apply_keybindings_for_previous(editwin)
 
     def __repr__(self) -> str:
         """Return representation of self."""
@@ -476,6 +572,7 @@ class idleuserextend:  # noqa: N801
     @classmethod
     def reload(cls) -> None:
         """Load class variables from configuration."""
+        # print(f"[{__title__}] reload fires")
         # Ensure file default values exist so they appear in settings menu
         save = cls.ensure_config_exists()
         if cls.ensure_bindings_exist() or save:
@@ -496,15 +593,19 @@ class idleuserextend:  # noqa: N801
                 )
                 setattr(cls, key, value)
 
-    def close(self) -> None:
-        """Restore IDLE to original state."""
+    # def close(self) -> None:
+    #     """Called when and IDLE window is closing."""
+    #     print("[idleuserextend] close fires")
+
+    def on_reloading(self) -> None:
+        """Idlereload integration, fired when about to reload."""
         setattr(
             idleConf,
             get_mangled(idleConf, "__GetRawExtensionKeys"),
             get_raw_extension_keys.__wrapped__,
         )
         idleConf.GetExtensionKeys = get_extension_keys.__wrapped__  # type: ignore[method-assign]
-        idleConf.GetExtensionBindings = get_ext_bindings.__wrapped__  # type: ignore[method-assign]
+        idleConf.GetExtensionBindings = get_extension_bindings.__wrapped__  # type: ignore[method-assign]
         idleConf.LoadCfgFiles = load_cfg_files.__wrapped__  # type: ignore[method-assign]
         idlelib.configdialog.ExtPage = original_ext_page  # type: ignore[misc]
 
