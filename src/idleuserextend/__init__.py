@@ -125,6 +125,16 @@ def yield_string_entries(
             yield entry
 
 
+def unwrap_attribute(obj: object, attr_name: str) -> bool:
+    """Unwrap attribute on object if it is wrapped. Return if unwrapped."""
+    attribute = getattr(obj, attr_name)
+    wrapped = getattr(attribute, "__wrapped__", None)
+    if wrapped is None:
+        return False
+    setattr(obj, attr_name, wrapped)
+    return True
+
+
 # [misc] Type of decorated function contains type "Any"
 @wraps(getattr(idleConf, get_mangled(idleConf, "__GetRawExtensionKeys")))
 def get_raw_extension_keys(extension: str) -> dict[str, list[str]]:  # type: ignore[misc]
@@ -301,6 +311,8 @@ original_ext_page = idlelib.configdialog.ExtPage
 
 class ExtPage(idlelib.configdialog.ExtPage):
     """Modified copy of ExtPage with patched load_extensions."""
+
+    __wrapped__ = original_ext_page
 
     def load_extensions(self) -> None:
         """Fill self.extensions with data from the default and user configs."""
@@ -602,15 +614,15 @@ class idleuserextend:  # noqa: N801
 
     def on_reloading(self) -> None:
         """Idlereload integration, fired when about to reload."""
-        setattr(
+        # print(f"[{__title__}]: on_reloading, unwrapping attributes")
+        unwrap_attribute(
             idleConf,
             get_mangled(idleConf, "__GetRawExtensionKeys"),
-            get_raw_extension_keys.__wrapped__,
         )
-        idleConf.GetExtensionKeys = get_extension_keys.__wrapped__  # type: ignore[method-assign]
-        idleConf.GetExtensionBindings = get_extension_bindings.__wrapped__  # type: ignore[method-assign]
-        idleConf.LoadCfgFiles = load_cfg_files.__wrapped__  # type: ignore[method-assign]
-        idlelib.configdialog.ExtPage = original_ext_page  # type: ignore[misc]
+        unwrap_attribute(idleConf, "GetExtensionKeys")
+        unwrap_attribute(idleConf, "GetExtensionBindings")
+        unwrap_attribute(idleConf, "LoadCfgFiles")
+        unwrap_attribute(idlelib.configdialog, "ExtPage")
 
 
 idleuserextend.reload()
