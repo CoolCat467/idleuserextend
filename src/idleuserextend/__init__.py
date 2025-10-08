@@ -38,7 +38,7 @@ from tkinter import StringVar
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
+    from collections.abc import Generator, Iterable, Sequence
     from idlelib.pyshell import PyShellEditorWindow
 
 
@@ -87,11 +87,12 @@ def ensure_section_exists(section: str) -> bool:
 
 def ensure_values_exist_in_section(
     section: str,
-    values: dict[str, str],
+    values: dict[str, str | None] | dict[str, str],
 ) -> bool:
     """For each key in values, make sure key exists. Return if edited.
 
-    If not, create and set to value.
+    If key does not exist and default value is not None, create and set
+    to value.
     """
     need_save = False
     for key, default in values.items():
@@ -101,7 +102,7 @@ def ensure_values_exist_in_section(
             key,
             warn_on_default=False,
         )
-        if value is None:
+        if value is None and default is not None:
             idleConf.SetOption("extensions", section, key, default)
             need_save = True
     return need_save
@@ -531,16 +532,18 @@ class idleuserextend:  # noqa: N801
     __slots__ = ("editwin",)
 
     # Extend the file and format menus.
-    menudefs: ClassVar = []
+    menudefs: ClassVar[
+        Sequence[tuple[str, Sequence[tuple[str, str] | None]]]
+    ] = ()
 
     # Default values for configuration file
-    values: ClassVar = {
+    values: ClassVar[dict[str, str]] = {
         "enable": "True",
         "enable_editor": "True",
         "enable_shell": "False",
     }
     # Default key binds for configuration file
-    bind_defaults: ClassVar = {}
+    bind_defaults: ClassVar[dict[str, str | None]] = {}
 
     def __init__(self, editwin: PyShellEditorWindow) -> None:
         """Initialize the settings for this extension."""
