@@ -7,6 +7,9 @@ Extension that fixes loading extensions from the user config file.
 
 <!-- END BADGIE TIME -->
 
+## Update 2026-04-11
+Since https://github.com/python/cpython/pull/28713 was finally merged, this project should no longer be required.
+
 ## What does this extension do?
 This IDLE extension patches IDLE to be able to properly load extensions
 from the user configuration directory (`~/.idlerc/config-extensions.cfg`)
