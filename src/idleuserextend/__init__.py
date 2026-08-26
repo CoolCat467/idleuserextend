@@ -540,7 +540,7 @@ class idleuserextend:  # noqa: N801
     values: ClassVar[dict[str, str]] = {
         "enable": "True",
         "enable_editor": "True",
-        "enable_shell": "False",
+        "enable_shell": "True",
     }
     # Default key binds for configuration file
     bind_defaults: ClassVar[dict[str, str | None]] = {}
